@@ -1,0 +1,7 @@
+[package]
+name = "stahl"
+version = "0.1.0"
+authors = ["Manuel Graf <m@grafoo.at>"]
+
+[dependencies]
+nix = "^0.9"
