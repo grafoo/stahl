@@ -1,12 +1,40 @@
 use std::path::Path;
 use std::io::ErrorKind;
-use std::fs;
+use std::io::prelude::*;
+use std::fs::{self, File};
 extern crate nix;
 use nix::mount::{mount, umount, MS_NOSUID, MS_NODEV, MS_NOEXEC, MS_RELATIME, MS_BIND};
+extern crate toml;
+#[macro_use]
+extern crate serde_derive;
+use std::collections::HashMap;
+use std::env;
+
+#[derive(Hash, Eq, PartialEq)]
+struct Dependency {
+    name: String,
+    source: String,
+    configuration: Vec<String>,
+}
+
+// todo: implement Deserialize for Dependency
+#[derive(Deserialize)]
+struct Blueprint {
+    name: String,
+    source: String,
+    dependencies: HashMap<String, HashMap<String, Vec<String>>>,
+}
 
 fn main() {
     const ROOTFS: &'static str = "rootfs";
     const NONE: Option<&'static [u8]> = None;
+
+    // read blueprint
+    let mut blueprint_file = File::open(env::args().nth(1).unwrap()).unwrap();
+    let mut blueprint = String::new();
+    blueprint_file.read_to_string(&mut blueprint).unwrap();
+
+    let blueprint: Blueprint = toml::from_str(&blueprint).unwrap();
 
     // assign absolute path of root filesystem in rootfs which will be used for chroot.
     // create rootfs if it doesn't exist.

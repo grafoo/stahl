@@ -1,0 +1,11 @@
+name = "tmux"
+source = "https://github.com/tmux/tmux/releases/download/2.3/tmux-2.3.tar.gz"
+configuration = ["enable-static"]
+
+[dependencies.libevent]
+source = ["https://github.com/libevent/libevent/releases/download/release-2.1.8-stable/libevent-2.1.8-stable.tar.gz"]
+configuration = ["disable-shared", "disable-openssl"]
+
+[dependencies.ncurses]
+source = ["https://ftp.gnu.org/gnu/ncurses/ncurses-6.0.tar.gz"]
+configuration = ["without-ada","without-cxx","without-cxx-binding","without-progs","without-tests"]
