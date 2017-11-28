@@ -4,25 +4,32 @@ use std::io::prelude::*;
 use std::fs::{self, File};
 extern crate nix;
 use nix::mount::{mount, umount, MS_NOSUID, MS_NODEV, MS_NOEXEC, MS_RELATIME, MS_BIND};
+use nix::unistd::chroot;
 extern crate toml;
 #[macro_use]
 extern crate serde_derive;
 use std::collections::HashMap;
 use std::env;
+extern crate reqwest;
+use reqwest::get;
+extern crate flate2;
+use flate2::read::GzDecoder;
+extern crate tar;
+use tar::Archive;
+use std::io::stdout;
 
-#[derive(Hash, Eq, PartialEq)]
+#[derive(Hash, Eq, PartialEq, Deserialize, Debug)]
 struct Dependency {
-    name: String,
     source: String,
     configuration: Vec<String>,
 }
 
-// todo: implement Deserialize for Dependency
-#[derive(Deserialize)]
+
+#[derive(Deserialize, Debug)]
 struct Blueprint {
     name: String,
     source: String,
-    dependencies: HashMap<String, HashMap<String, Vec<String>>>,
+    dependencies: HashMap<String, Dependency>,
 }
 
 fn main() {
@@ -35,6 +42,8 @@ fn main() {
     blueprint_file.read_to_string(&mut blueprint).unwrap();
 
     let blueprint: Blueprint = toml::from_str(&blueprint).unwrap();
+
+
 
     // assign absolute path of root filesystem in rootfs which will be used for chroot.
     // create rootfs if it doesn't exist.
@@ -57,6 +66,7 @@ fn main() {
     let rootfs_sys = rootfs.join("sys");
     let rootfs_dev = rootfs.join("dev");
     let rootfs_dev_pts = rootfs.join("dev/pts");
+    let mut rootfs_tmp = rootfs.join("tmp");
 
     let pseudofs = vec![&rootfs_proc, &rootfs_sys, &rootfs_dev_pts, &rootfs_dev];
 
@@ -92,6 +102,32 @@ fn main() {
         MS_BIND,
         NONE,
     ).unwrap();
+
+    //mount(
+    //    Some("tmpfs"),
+    //    &rootfs_tmp,
+    //    Some("tmpfs"),
+    //    MS_NOSUID | MS_NODEV,
+    //    NONE,
+    //).unwrap();
+
+    // unpack the dependency sources
+    for (_, dependency) in blueprint.dependencies.iter() {
+        print!("fetching {}... ", dependency.source);
+        stdout().flush().unwrap();
+
+        let mut response = get(dependency.source.as_str()).unwrap();
+        let mut body: Vec<u8> = vec![];
+        response.copy_to(&mut body).unwrap();
+        let mut decoder = GzDecoder::new(body.as_slice()).unwrap();
+        let mut tarball: Vec<u8> = vec![];
+        decoder.read_to_end(&mut tarball).unwrap();
+        let mut archive = Archive::new(tarball.as_slice());
+        archive.unpack(&mut rootfs_tmp).unwrap();
+        println!("done");
+    }
+
+    // nix::unistd::chroot(&rootfs).unwrap();
 
     // unmount the pseudo filesystems.
     for fs in pseudofs.iter() {
